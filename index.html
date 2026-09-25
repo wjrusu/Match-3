@@ -1,0 +1,764 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Кристальный хаос</title>
+<style>
+:root{
+  --bg1:#10162b;--bg2:#25123d;--panel:rgba(255,255,255,.09);
+  --text:#fff;--muted:#b9bdd3;--cell:min(10.5vw,62px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;font-family:Arial,sans-serif;color:var(--text)}
+body{
+  background:radial-gradient(circle at 50% 20%,#47306b 0,#24163e 35%,#0d1225 100%);
+  display:flex;justify-content:center;align-items:center;
+}
+body:before{content:"";position:fixed;inset:0;background:
+ radial-gradient(circle at 15% 85%,rgba(0,220,255,.12),transparent 30%),
+ radial-gradient(circle at 85% 10%,rgba(255,70,180,.12),transparent 28%);
+ pointer-events:none}
+#app{width:min(100%,620px);height:100%;display:flex;flex-direction:column;padding:18px 14px 14px;position:relative}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.logo{font-size:22px;font-weight:900;letter-spacing:.5px;text-shadow:0 3px 15px #000}
+.scoreBox{background:var(--panel);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:7px 12px;text-align:right;min-width:100px}
+.scoreBox small{display:block;color:var(--muted);font-size:10px;text-transform:uppercase}
+.score{font-size:20px;font-weight:900}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.stat{background:var(--panel);border:1px solid rgba(255,255,255,.1);border-radius:13px;padding:8px 12px}
+.stat span{display:block;color:var(--muted);font-size:10px;text-transform:uppercase}
+.stat b{font-size:16px}
+#boardWrap{
+  flex:1;display:flex;align-items:center;justify-content:center;min-height:0;
+}
+#board{
+  width:min(94vw,560px);aspect-ratio:1/1;position:relative;
+  padding:8px;background:rgba(4,7,18,.55);border:1px solid rgba(255,255,255,.12);
+  border-radius:20px;box-shadow:0 18px 55px rgba(0,0,0,.4),inset 0 1px rgba(255,255,255,.08);
+  touch-action:none;overflow:hidden;
+}
+.cell-layer,.gem-layer{position:absolute;inset:8px}
+.cell-layer{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;z-index:1}
+.gem-layer{z-index:2;pointer-events:none}
+
+.cell{position:relative;border-radius:11px;background:rgba(255,255,255,.045);cursor:pointer}
+.gem{position:absolute;
+ width:calc((100% - 35px) / 8);height:calc((100% - 35px) / 8);
+ left:calc(var(--c) * ((100% - 35px) / 8 + 5px));
+ top:calc(var(--r) * ((100% - 35px) / 8 + 5px));
+ border-radius:29%;transform:rotate(45deg) scale(.84);transform-origin:center;
+ box-shadow:inset 0 3px 5px rgba(255,255,255,.42),inset 0 -7px 10px rgba(0,0,0,.2),0 4px 10px rgba(0,0,0,.28);
+ transition:left .245s cubic-bezier(.22,.8,.24,1),top .245s cubic-bezier(.22,.8,.24,1),transform .18s cubic-bezier(.22,.8,.24,1),filter .18s ease,opacity .18s ease}
+.gem:after{content:"";position:absolute;left:18%;top:12%;width:30%;height:17%;border-radius:50%;background:rgba(255,255,255,.5);filter:blur(2px)}
+.g0{background:linear-gradient(145deg,#55eaff,#0875ff)}
+.g1{background:linear-gradient(145deg,#ff77c8,#d71978)}
+.g2{background:linear-gradient(145deg,#ffe86c,#ff8a00)}
+.g3{background:linear-gradient(145deg,#91ff8c,#20a83b)}
+.g4{background:linear-gradient(145deg,#c693ff,#6e32dc)}
+.g5{background:linear-gradient(145deg,#fff,#8e9bad)}
+.gem.selected{transform:rotate(45deg) scale(.72);filter:brightness(1.35);box-shadow:0 0 0 3px rgba(255,255,255,.95),0 0 18px rgba(180,150,255,.9),inset 0 3px 5px rgba(255,255,255,.55),inset 0 -7px 10px rgba(0,0,0,.2)}
+.pop{transform:rotate(45deg) scale(1.14)!important;filter:brightness(1.8);opacity:0;transition:transform .22s cubic-bezier(.2,.8,.2,1),opacity .22s ease,filter .22s ease!important}
+.spawn{opacity:0;transform:rotate(45deg) scale(.72)}
+.spawn.land{opacity:1;transform:rotate(45deg) scale(.84);transition:transform .28s cubic-bezier(.18,.85,.25,1),opacity .18s ease}
+
+.fx-layer{position:absolute;inset:8px;z-index:4;pointer-events:none;overflow:hidden}
+.fx{position:absolute;left:0;top:0;pointer-events:none;will-change:transform,opacity}
+.fx-ring{position:absolute;width:42px;height:42px;border:4px solid rgba(255,255,255,.95);border-radius:50%;transform:translate(-50%,-50%) scale(.2);opacity:0;animation:ringBurst .46s cubic-bezier(.12,.75,.22,1) forwards;box-shadow:0 0 18px rgba(255,255,255,.8)}
+.fx-ring.gold{border-color:#ffe66d;box-shadow:0 0 24px #ffb300}
+.fx-ring.purple{border-color:#d9a2ff;box-shadow:0 0 26px #9d4dff}
+@keyframes ringBurst{15%{opacity:1}100%{transform:translate(-50%,-50%) scale(2.8);opacity:0}}
+.fx-spark{position:absolute;width:7px;height:20px;border-radius:8px;background:#fff;left:0;top:0;transform-origin:50% 100%;opacity:0;animation:sparkFly .48s cubic-bezier(.1,.7,.2,1) forwards;box-shadow:0 0 10px currentColor}
+@keyframes sparkFly{0%{opacity:1;transform:translate(-50%,-50%) rotate(var(--ang)) translateY(0) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) rotate(var(--ang)) translateY(var(--dist)) scale(.25)}}
+.fx-beam{position:absolute;height:9px;border-radius:99px;transform-origin:left center;opacity:0;background:linear-gradient(90deg,rgba(255,255,255,.95),#b56cff,rgba(255,255,255,0));box-shadow:0 0 18px #b56cff;animation:beamIn .42s ease-out forwards}
+@keyframes beamInV{0%{opacity:0;transform:scaleY(0)}35%{opacity:1}100%{opacity:0;transform:scaleY(1)}}
+@keyframes beamIn{0%{opacity:0;transform:scaleX(0)}35%{opacity:1}100%{opacity:0;transform:scaleX(1)}}
+.fx-cross{position:absolute;width:62px;height:62px;transform:translate(-50%,-50%) rotate(45deg) scale(.2);opacity:0;border-radius:16px;border:6px solid #fff;box-shadow:0 0 28px #c56cff,inset 0 0 24px #fff;animation:crossBoom .55s cubic-bezier(.1,.7,.2,1) forwards}
+@keyframes crossBoom{15%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) rotate(45deg) scale(1.7)}}
+.fx-flash{position:absolute;width:110px;height:110px;border-radius:50%;transform:translate(-50%,-50%) scale(.1);opacity:0;background:radial-gradient(circle,rgba(255,255,255,1) 0,rgba(255,235,110,.9) 18%,rgba(255,90,0,.45) 45%,transparent 72%);animation:flashBoom .5s ease-out forwards;filter:blur(.5px)}
+@keyframes flashBoom{10%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(3.1)}}
+.fx-shock{position:absolute;width:52px;height:52px;border:8px solid rgba(255,170,40,.9);border-radius:50%;transform:translate(-50%,-50%) scale(.15);opacity:0;animation:shock .62s cubic-bezier(.08,.65,.18,1) forwards;box-shadow:0 0 25px #ff7a00}
+@keyframes shock{12%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(3.9)}}
+
+footer{padding-top:12px;display:flex;gap:9px}
+button{border:0;border-radius:14px;padding:12px 15px;background:rgba(255,255,255,.1);color:#fff;font-weight:800;font-size:14px;cursor:pointer;flex:1}
+button:active{transform:scale(.97)}
+.primary{background:linear-gradient(135deg,#7b4dff,#b52cff);box-shadow:0 8px 25px rgba(130,50,255,.25)}
+#message{white-space:pre-line;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(.8);background:rgba(9,11,25,.94);border:1px solid rgba(255,255,255,.18);padding:22px 28px;border-radius:20px;text-align:center;box-shadow:0 20px 60px #0008;opacity:0;pointer-events:none;transition:opacity .22s ease,transform .22s ease;z-index:5}
+#message.show{opacity:1;transform:translate(-50%,-50%) scale(1);pointer-events:auto}
+#message h2{margin:0 0 8px;font-size:25px}
+#message p{margin:5px 0 16px;color:var(--muted)}
+@media(max-width:420px){.logo{font-size:19px}.stat{padding:7px 10px}#board{border-radius:16px;padding:6px}.cell-layer,.gem-layer{inset:6px}.cell-layer{gap:3px}.gem{width:calc((100% - 21px)/8);height:calc((100% - 21px)/8);left:calc(var(--c) * ((100% - 21px)/8 + 3px));top:calc(var(--r) * ((100% - 21px)/8 + 3px))}}
+
+.fx-mega{position:absolute;left:50%;top:50%;width:18px;height:18px;border-radius:50%;transform:translate(-50%,-50%) scale(.1);opacity:0;background:radial-gradient(circle,#fff 0 8%,#ffe36b 18%,#ff7b00 42%,rgba(255,50,0,.25) 62%,transparent 72%);box-shadow:0 0 35px #ffb300,0 0 70px #ff5a00;animation:megaBoom .72s cubic-bezier(.08,.7,.18,1) forwards}
+.fx-mega-ring{position:absolute;width:40px;height:40px;border:10px solid rgba(255,215,70,.95);border-radius:50%;transform:translate(-50%,-50%) scale(.1);opacity:0;box-shadow:0 0 35px #ff8a00;animation:megaRing .72s cubic-bezier(.08,.7,.18,1) forwards}
+.fx-wave{position:absolute;width:100%;height:100%;left:0;top:0;border-radius:50%;border:7px solid rgba(255,255,255,.9);box-shadow:0 0 30px #ffd34e,inset 0 0 30px #ff7a00;transform:scale(.05);opacity:0;animation:boardWave .62s ease-out forwards}
+.fx-star{position:absolute;width:5px;height:34px;border-radius:99px;background:#fff;box-shadow:0 0 14px #ffd34e;transform-origin:50% 100%;opacity:0;animation:megaStar .7s cubic-bezier(.08,.7,.18,1) forwards}
+@keyframes megaBoom{10%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(15)}}
+@keyframes megaRing{10%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(9)}}
+@keyframes boardWave{8%{opacity:.85}100%{opacity:0;transform:scale(1.35)}}
+@keyframes megaStar{0%{opacity:1;transform:rotate(var(--ang)) translateY(0) scale(1)}100%{opacity:0;transform:rotate(var(--ang)) translateY(var(--dist)) scale(.15)}}
+.board-shake{animation:boardShake .32s ease-out}
+@keyframes boardShake{0%,100%{transform:translate(0,0)}15%{transform:translate(-5px,3px)}30%{transform:translate(5px,-3px)}45%{transform:translate(-4px,-2px)}60%{transform:translate(4px,2px)}75%{transform:translate(-2px,0)}}
+
+</style>
+
+<style>
+.bonusText{
+ position:fixed;left:50%;top:44%;transform:translate(-50%,-50%);
+ z-index:20;font-size:30px;font-weight:900;color:#fff;
+ text-shadow:0 3px 16px rgba(0,0,0,.8),0 0 18px rgba(130,90,255,.9);
+ animation:bonusFloat .9s ease-out forwards;pointer-events:none;
+}
+#continueBtn{margin-top:10px;width:100%}#continueBtn:disabled{opacity:.65;cursor:wait}
+@keyframes bonusFloat{
+  0%{opacity:0;transform:translate(-50%,-30%) scale(.7)}
+  18%{opacity:1;transform:translate(-50%,-50%) scale(1.08)}
+  100%{opacity:0;transform:translate(-50%,-95%) scale(1)}
+}
+
+.abilityBar{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.ability{position:relative;padding:9px 6px 8px;min-height:58px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);border-radius:13px;line-height:1.05}
+.ability .icon{display:block;font-size:20px;margin-bottom:3px}
+.ability .name{display:block;font-size:11px;font-weight:900}
+.ability .count{display:block;margin-top:3px;font-size:10px;color:var(--muted)}
+.ability.armed{background:linear-gradient(135deg,rgba(123,77,255,.45),rgba(181,44,255,.28));border-color:rgba(220,190,255,.8);box-shadow:0 0 18px rgba(160,90,255,.35)}
+.ability.ad{font-size:11px}
+#board.abilityMode{cursor:crosshair;box-shadow:0 0 0 2px rgba(181,92,255,.45),0 18px 55px rgba(0,0,0,.4)}
+.hintInfo{margin-top:7px;text-align:center;color:var(--muted);font-size:10px}
+.progressPanel{margin-top:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:10px 12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px}
+.progressPanel b{font-size:13px}
+.progressPanel .wide{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.progressPanel button{padding:7px 10px;font-size:11px;flex:0 0 auto}
+.progressBar{height:5px;background:rgba(255,255,255,.1);border-radius:99px;overflow:hidden;margin-top:5px}.progressFill{height:100%;width:0;background:linear-gradient(90deg,#7b4dff,#c63cff);transition:width .25s ease}
+#upgradePanel{position:fixed;inset:0;background:rgba(5,7,18,.82);backdrop-filter:blur(7px);z-index:30;display:none;align-items:center;justify-content:center;padding:16px}
+#upgradePanel.show{display:flex}.upgradeCard{width:min(100%,460px);max-height:90vh;overflow:auto;background:linear-gradient(145deg,#251746,#11162c);border:1px solid rgba(255,255,255,.14);border-radius:22px;padding:18px;box-shadow:0 25px 80px #000b}
+.upgradeCard h2{margin:0 0 8px}.upgradeCard .sub{color:var(--muted);font-size:11px;margin-bottom:12px}.upgradeRow{background:rgba(255,255,255,.06);border-radius:14px;padding:11px;margin:8px 0}.upgradeRow .top{display:flex;justify-content:space-between;gap:10px}.upgradeRow small{display:block;color:var(--muted);margin-top:4px}.upgradeRow button{margin-top:8px;width:100%;padding:9px}.statsGrid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px}.statMini{background:rgba(255,255,255,.05);padding:8px;border-radius:10px}.statMini span{display:block;color:var(--muted);font-size:9px}.statMini b{font-size:13px}
+
+@media(max-width:420px){.ability{min-height:54px;padding:7px 4px}.ability .icon{font-size:18px}.ability .name{font-size:10px}}
+</style>
+
+
+<style>
+#app.game-mode .progressPanel{display:none}
+#app.game-mode{padding-top:18px}
+#menuScreen{position:fixed;inset:0;z-index:50;background:radial-gradient(circle at 50% 18%,#47306b 0,#24163e 38%,#0d1225 100%);display:flex;align-items:center;justify-content:center;padding:18px}
+.menuShell{width:min(100%,620px);height:100%;display:flex;flex-direction:column;position:relative}
+.menuTop{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.currencyBar{display:flex;gap:8px;flex:1}
+.currency{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.13);border-radius:13px;padding:8px 12px;min-width:112px}
+.currency small{display:block;color:var(--muted);font-size:9px;text-transform:uppercase}.currency b{font-size:16px}
+.menuContent{flex:1;display:flex;align-items:center;justify-content:center;text-align:center}
+.menuHome{width:100%;display:flex;flex-direction:column;align-items:center}
+.gameIcon{width:112px;height:112px;border-radius:28px;background:linear-gradient(145deg,#7b4dff,#b52cff);display:flex;align-items:center;justify-content:center;font-size:60px;box-shadow:0 18px 55px rgba(130,50,255,.35),inset 0 2px 8px rgba(255,255,255,.35);transform:rotate(45deg);margin-bottom:34px}
+.gameIcon span{transform:rotate(-45deg)}
+.menuTitle{font-size:28px;font-weight:900;letter-spacing:.5px}.menuRecord{margin-top:9px;color:var(--muted);font-size:13px}
+.playBtn{margin-top:25px;width:min(330px,80%);font-size:18px;padding:15px 20px}
+.menuNav{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;padding-top:12px}
+.navBtn{min-height:62px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);border-radius:15px;color:#fff;font-weight:900;font-size:11px}.navBtn.active{background:linear-gradient(135deg,rgba(123,77,255,.55),rgba(181,44,255,.38));border-color:rgba(220,190,255,.55)}.navBtn.locked{opacity:.48;filter:saturate(.5);cursor:not-allowed}.storeNote{background:rgba(255,255,255,.05);border-radius:13px;padding:9px 11px;color:var(--muted);font-size:10px;margin-bottom:9px;text-align:center}.storeItem{flex-wrap:wrap}.storeItem .storeBuy{display:grid;grid-template-columns:1fr 1fr;gap:6px;flex:0 0 auto}.storeItem .storeBuy button{min-width:92px}.inventory{font-size:10px;color:#fff;margin-top:3px}.upgradeLocked{background:rgba(255,255,255,.06);border-radius:14px;padding:13px;text-align:center;color:var(--muted);margin-bottom:10px}.upgradeMain{background:rgba(255,255,255,.06);border-radius:14px;padding:13px;margin:10px 0}.upgradeMain .bigStats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.bigStat{background:rgba(255,255,255,.05);border-radius:11px;padding:10px;text-align:center}.bigStat small{display:block;color:var(--muted);font-size:9px}.bigStat b{font-size:20px;display:block;margin-top:3px}
+.menuPage{width:100%;max-height:78vh;overflow:auto}.menuPage h2{margin:0 0 8px;font-size:25px}.menuPage .sub{color:var(--muted);font-size:11px;margin-bottom:14px}
+.storeGrid{display:grid;grid-template-columns:1fr;gap:9px;text-align:left}.storeItem{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:15px;padding:12px;display:flex;align-items:center;gap:12px}.storeIcon{font-size:30px;width:42px;text-align:center}.storeItem .info{flex:1}.storeItem b{display:block}.storeItem small{color:var(--muted)}.storeItem button{flex:0 0 auto;padding:9px 12px;font-size:11px}
+.menuUpgrade .upgradeCard{width:100%;max-height:70vh;background:transparent;border:0;box-shadow:none;padding:0}
+.menuUpgrade .upgradeCard h2{font-size:25px}
+@media(max-width:420px){.currency{min-width:0;flex:1;padding:8px 9px}.gameIcon{width:92px;height:92px;font-size:48px;margin-bottom:28px}.menuTitle{font-size:23px}}
+
+.rewardsTeaser{margin-top:18px;width:min(420px,88%);background:linear-gradient(135deg,rgba(255,204,75,.18),rgba(181,44,255,.16));border:1px solid rgba(255,220,120,.28);border-radius:16px;padding:11px 14px;text-align:left;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.16)}
+.rewardsTeaser .rtop{display:flex;align-items:center;gap:10px}.rewardsTeaser .gift{font-size:28px}.rewardsTeaser b{font-size:13px}.rewardsTeaser small{display:block;color:var(--muted);margin-top:2px;font-size:10px}
+.rewardPage{width:100%;max-height:78vh;overflow:auto}.rewardPage h2{margin:0 0 6px;font-size:25px}.rewardTabs{display:flex;gap:7px;margin:10px 0}.rewardTab{padding:9px 11px;font-size:11px;border-radius:12px;background:rgba(255,255,255,.08)}.rewardTab.active{background:linear-gradient(135deg,#7b4dff,#b52cff)}
+.calendarGrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin:10px 0}.dayCard{min-width:0;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:11px;padding:8px 4px;text-align:center}.dayCard.current{border-color:rgba(255,218,95,.8);box-shadow:0 0 16px rgba(255,200,70,.16)}.dayCard.claimed{opacity:.58}.dayCard .day{font-size:9px;color:var(--muted)}.dayCard .reward{font-size:11px;font-weight:900;margin-top:5px;line-height:1.15}.dayCard .check{font-size:12px;margin-top:4px}.claimBox{background:rgba(255,255,255,.06);border-radius:14px;padding:12px;text-align:center;margin-top:9px}.claimBox b{display:block;font-size:15px}.claimBox small{color:var(--muted);display:block;margin:4px 0 9px}.dailyAds{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px}.dailyAd{background:rgba(255,255,255,.06);border-radius:13px;padding:10px;text-align:center}.dailyAd b{display:block;font-size:13px}.dailyAd small{display:block;color:var(--muted);margin:3px 0 8px}.dailyAd button{font-size:10px;padding:8px}.achGrid{display:grid;grid-template-columns:1fr;gap:7px}.achItem{background:rgba(255,255,255,.06);border-radius:12px;padding:10px;display:flex;gap:10px;align-items:center}.achIcon{font-size:24px;width:34px;text-align:center}.achInfo{flex:1}.achInfo b{display:block;font-size:12px}.achInfo small{display:block;color:var(--muted);font-size:9px;margin-top:2px}.achReward{font-size:10px;font-weight:900;text-align:right}.achBar{height:4px;background:rgba(255,255,255,.1);border-radius:99px;overflow:hidden;margin-top:6px}.achBar i{display:block;height:100%;background:linear-gradient(90deg,#7b4dff,#c63cff);width:0}.rewardBack{margin-top:10px;width:100%}
+@media(max-width:420px){.calendarGrid{gap:4px}.dayCard{padding:7px 2px}.dayCard .reward{font-size:9px}.dailyAds{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="app">
+<header><div class="logo">💎 КРИСТАЛЬНЫЙ ХАОС</div><div class="scoreBox"><small>Счёт</small><div class="score" id="score">0</div></div></header>
+<div class="stats">
+ <div class="stat"><span>Ход</span><b id="moves">30</b></div>
+ <div class="stat"><span>Рекорд</span><b id="best">0</b></div>
+</div>
+<div class="progressPanel" id="inGameProgress">
+ <div>Уровень <b id="accountLevel">1</b></div>
+ <div>🪙 Монеты <b id="coins">0</b></div>
+ <div class="wide"><span>До следующего уровня: <b id="levelProgressText">0 / 100</b></span><button id="upgradeBtn">Прокачка</button></div>
+ <div class="wide"><div style="flex:1"><div class="progressBar"><div class="progressFill" id="levelProgressFill"></div></div></div><span id="scoreMultiplier">×1.00</span></div>
+</div>
+<div id="boardWrap"><div id="board"></div></div>
+<div class="abilityBar">
+ <button class="ability" id="bomb"><span class="icon">💣</span><span class="name">Бомбочка</span><span class="count" id="bombCount">Реклама</span></button>
+ <button class="ability" id="rocketH"><span class="icon">🚀</span><span class="name">Ракета ↔</span><span class="count" id="rocketHCount">Реклама</span></button>
+ <button class="ability" id="rocketV"><span class="icon">🚀</span><span class="name">Ракета ↕</span><span class="count" id="rocketVCount">Реклама</span></button>
+</div>
+<div class="hintInfo" id="hintInfo">Бесплатные подсказки: 5</div>
+<footer><button id="new">Новая игра</button><button class="primary" id="hint">Подсказка</button></footer>
+<div id="message"><h2>Игра окончена</h2><p id="final"></p><button class="primary" id="again">Играть снова</button><button id="toMenu">Главное меню</button></div><div id="upgradePanel"><div class="upgradeCard">
+ <h2>⚡ Прокачка аккаунта</h2>
+ <div class="sub">Монеты зарабатываются по эффективности в раундах. Улучшения постоянные.</div>
+ <div class="upgradeRow"><div class="top"><b>Стартовые попытки</b><b id="movesUpgradeValue">30</b></div><small>+1 попытка за каждый уровень. Следующий уровень: <span id="nextMovesValue">31</span></small><button class="primary" id="buyMovesLevel">Повысить уровень</button></div>
+ <div class="upgradeRow"><div class="top"><b>Множитель очков</b><b id="multUpgradeValue">×1.00</b></div><small>Множитель растёт с уровнем и усиливает очки за комбинации.</small><button class="primary" id="buyAccountLevel">Повысить уровень</button></div>
+ <div class="statsGrid"><div class="statMini"><span>3 в ряд</span><b id="stat3">0</b></div><div class="statMini"><span>4 в ряд</span><b id="stat4">0</b></div><div class="statMini"><span>5+ в ряд</span><b id="stat5">0</b></div><div class="statMini"><span>Взрывы</span><b id="statExplosions">0</b></div><div class="statMini"><span>Раунды</span><b id="statRounds">0</b></div><div class="statMini"><span>Всего очищено</span><b id="statCleared">0</b></div></div>
+ <button id="closeUpgrade" style="width:100%;margin-top:10px">Закрыть</button>
+</div></div>
+</div>
+<div id="menuScreen">
+  <div class="menuShell">
+    <div class="menuTop">
+      <div class="currencyBar">
+        <div class="currency"><small>Монеты</small><b>🪙 <span id="menuCoins">0</span></b></div>
+        <div class="currency"><small>Рубины</small><b>♦ <span id="menuRubies">25</span></b></div>
+      </div>
+    </div>
+    <div class="menuContent">
+      <div class="menuPage" id="menuHome">
+        <div class="menuHome">
+          <div class="gameIcon"><span>💎</span></div>
+          <div class="menuTitle">КРИСТАЛЬНЫЙ ХАОС</div>
+          <div class="menuRecord">МАКСИМАЛЬНЫЙ СЧЁТ: <b id="menuBest">0</b></div>
+          <button class="primary playBtn" id="playBtn">НАЧАТЬ ИГРУ</button>
+          <button class="rewardsTeaser" id="rewardsTeaser"><div class="rtop"><span class="gift">🎁</span><div><b id="rewardTeaserTitle">ЕЖЕДНЕВНАЯ НАГРАДА</b><small id="rewardTeaserSub">День 1 из 7 • Забери награду</small></div></div></button>
+        </div>
+      </div>
+      <div class="menuPage" id="menuStore" style="display:none">
+        <h2>🛒 Магазин</h2><div class="sub">Постоянные покупки за рубины. Баланс пока тестовый.</div>
+        <div class="storeNote">♦ Рубины тратятся на постоянные заряды. Реклама во время раунда даёт временный заряд и не расходует рубины.</div>
+        <div class="storeGrid">
+          <div class="storeItem"><div class="storeIcon">💣</div><div class="info"><b>Бомбочка</b><small>Взрыв 3×3</small><div class="inventory">В запасе: <b id="invBomb">0</b></div></div><div class="storeBuy"><button class="primary" id="buyBomb1">♦ 12 ×1</button><button class="primary" id="buyBomb5">♦ 50 ×5</button></div></div>
+          <div class="storeItem"><div class="storeIcon">🚀</div><div class="info"><b>Ракета ↔</b><small>Уничтожает горизонтальную линию</small><div class="inventory">В запасе: <b id="invRocketH">0</b></div></div><div class="storeBuy"><button class="primary" id="buyRocketH1">♦ 10 ×1</button><button class="primary" id="buyRocketH5">♦ 42 ×5</button></div></div>
+          <div class="storeItem"><div class="storeIcon">🚀</div><div class="info"><b>Ракета ↕</b><small>Уничтожает вертикальную линию</small><div class="inventory">В запасе: <b id="invRocketV">0</b></div></div><div class="storeBuy"><button class="primary" id="buyRocketV1">♦ 10 ×1</button><button class="primary" id="buyRocketV5">♦ 42 ×5</button></div></div>
+        </div>
+      </div>
+      <div class="menuPage menuUpgrade" id="menuUpgrade" style="display:none">
+        <div class="upgradeCard">
+          <h2>⚡ Прокачка аккаунта</h2>
+          <div class="sub">Здесь находится уровень аккаунта, статистика и постоянные улучшения.</div>
+          <div id="upgradeLocked" class="upgradeLocked">🔒 Прокачка откроется после первого завершённого раунда на 1 уровне.</div>
+          <div id="upgradeMain" class="upgradeMain"><div class="top"><b>Уровень аккаунта</b><b id="menuLevelValue">1</b></div><small style="color:var(--muted)">До следующего уровня: <span id="menuLevelProgress">0 / 500</span></small><div class="progressBar"><div class="progressFill" id="menuLevelFill"></div></div><div class="bigStats"><div class="bigStat"><small>СТАРТОВЫЕ ПОПЫТКИ</small><b id="movesUpgradeValue2">30</b></div><div class="bigStat"><small>МНОЖИТЕЛЬ ОЧКОВ</small><b id="multUpgradeValue2">×1.00</b></div></div><button class="primary" id="buyAccountLevel2" style="margin-top:10px;width:100%">Повысить уровень</button></div>
+          <div class="statsGrid"><div class="statMini"><span>3 в ряд</span><b id="stat3m">0</b></div><div class="statMini"><span>4 в ряд</span><b id="stat4m">0</b></div><div class="statMini"><span>5+ в ряд</span><b id="stat5m">0</b></div><div class="statMini"><span>Взрывы</span><b id="statExplosionsm">0</b></div><div class="statMini"><span>Раунды</span><b id="statRoundsM">0</b></div><div class="statMini"><span>Всего очищено</span><b id="statClearedM">0</b></div></div>
+        </div>
+      </div>
+      <div class="menuPage rewardPage" id="menuRewards" style="display:none">
+        <h2>🎁 Награды</h2>
+        <div class="sub">Ежедневный вход, рекламные бонусы и достижения.</div>
+        <div class="rewardTabs"><button class="rewardTab active" id="rewardTabCalendar">📅 Календарь</button><button class="rewardTab" id="rewardTabAchievements">🏆 Достижения</button></div>
+        <div id="calendarPanel">
+          <div class="calendarGrid" id="calendarGrid"></div>
+          <div class="claimBox"><b id="dailyClaimTitle">Награда дня</b><small id="dailyClaimSub">Забери награду за сегодняшний вход.</small><button class="primary" id="claimDailyBtn">🎁 ЗАБРАТЬ</button></div>
+          <div class="dailyAds">
+            <div class="dailyAd"><b>🪙 +1 500 монет</b><small id="coinAdStatus">1 раз в сутки</small><button class="primary" id="coinAdBtn">📺 Получить</button></div>
+            <div class="dailyAd"><b>♦ +5 рубинов</b><small id="rubyAdStatus">1 раз в сутки</small><button class="primary" id="rubyAdBtn">📺 Получить</button></div>
+          </div>
+        </div>
+        <div id="achievementsPanel" style="display:none"><div class="achGrid" id="achGrid"></div></div>
+        <button class="rewardBack" id="rewardBack">Вернуться на главную</button>
+      </div>
+      <div class="menuPage" id="menuAdmin" style="display:none">
+        <div class="upgradeCard">
+          <h2>🛠 Админ-панель</h2>
+          <div class="sub">Локальная панель тестирования. Изменения сохраняются в аккаунте.</div>
+          <div class="statsGrid">
+            <div class="statMini"><span>Монеты</span><b id="adminCoins">0</b></div>
+            <div class="statMini"><span>Рубины</span><b id="adminRubies">0</b></div>
+            <div class="statMini"><span>Уровень</span><b id="adminLevel">1</b></div>
+            <div class="statMini"><span>Раунды</span><b id="adminRounds">0</b></div>
+          </div>
+          <div class="upgradeMain">
+            <b>🪙 Накрутка монет</b>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px">
+              <button id="adminCoins100">+100</button><button id="adminCoins1000">+1 000</button>
+              <button id="adminCoins10000">+10 000</button><button id="adminCoinsMax">+100 000</button>
+            </div>
+          </div>
+          <div class="upgradeMain">
+            <b>♦ Накрутка рубинов</b>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px">
+              <button id="adminRubies10">+10</button><button id="adminRubies100">+100</button>
+              <button id="adminRubies1000">+1 000</button><button id="adminRubiesMax">+10 000</button>
+            </div>
+          </div>
+          <div class="upgradeMain">
+            <b>Сброс</b>
+            <small style="display:block;color:var(--muted);margin-top:5px">Сбрасывает монеты, рубины, уровень, статистику, достижения, ежедневные награды и рекорд.</small>
+            <button id="adminReset" style="width:100%;margin-top:10px">♻ Полный сброс прогресса</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="menuNav">
+      <button class="navBtn" id="navStore">🛒<br>МАГАЗИН</button>
+      <button class="navBtn active" id="navHome">🏠<br>ГЛАВНАЯ</button>
+      <button class="navBtn" id="navUpgrade">⚡<br>ПРОКАЧКА</button>
+      <button class="navBtn" id="navAdmin">🛠<br>АДМИН</button>
+    </div>
+  </div>
+</div>
+
+<script>(() => {
+const N=8,TYPES=6,MOVE_MS=245,POP_MS=225,FALL_MS=280;
+let board=[],tiles=[],selected=-1,score=0,moves=30,busy=false,nextId=1;
+const el=id=>document.getElementById(id), grid=el('board');
+let best=+localStorage.getItem('crystal_best')||0;
+const savedAccount=JSON.parse(localStorage.getItem('crystal_account')||'null');
+const account=savedAccount||{level:1,coins:2000,rubies:25,boosters:{bomb:0,rocketH:0,rocketV:0},stats:{match3:0,match4:0,match5:0,explosions:0,cleared:0,rounds:0}};
+account.level=Number(account.level)||1;account.coins=Number(account.coins)||0;account.rubies=Number.isFinite(account.rubies)?account.rubies:25;account.boosters=Object.assign({bomb:0,rocketH:0,rocketV:0},account.boosters||{});account.boosters.bomb=Math.max(0,Number(account.boosters.bomb)||0);account.boosters.rocketH=Math.max(0,Number(account.boosters.rocketH)||0);account.boosters.rocketV=Math.max(0,Number(account.boosters.rocketV)||0);account.stats=Object.assign({match3:0,match4:0,match5:0,explosions:0,cleared:0,rounds:0},account.stats||{});
+if(savedAccount && !savedAccount.economyVersion && account.stats.rounds===0 && account.coins<2000){account.coins=2000;}
+account.economyVersion=8;
+function saveAccount(){localStorage.setItem('crystal_account',JSON.stringify(account));}
+if(!savedAccount){saveAccount()}
+let freeHints=5,hintAdBusy=false,abilityMode=null,abilityCharges={bomb:account.boosters.bomb,rocketH:account.boosters.rocketH,rocketV:account.boosters.rocketV};
+let abilityAdBusy=false,continueAdUsed=false,boosterAdsUsed=0;
+let roundStats={match3:0,match4:0,match5:0,explosions:0,cleared:0};
+el('best').textContent=best;
+function random(){return Math.floor(Math.random()*TYPES)}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+function makeBoard(){
+ board=[];tiles=[];
+ for(let r=0;r<N;r++){
+   board[r]=[];
+   for(let c=0;c<N;c++){
+     let v;
+     do{
+       v=random();
+     }while(
+       (c>=2 && board[r][c-1]?.v===v && board[r][c-2]?.v===v) ||
+       (r>=2 && board[r-1][c]?.v===v && board[r-2][c]?.v===v)
+     );
+     const t={id:nextId++,v,r,c,el:null};
+     board[r][c]=t;
+     tiles.push(t);
+   }
+ }
+}
+function buildBoard(){
+ grid.innerHTML='<div class="cell-layer"></div><div class="gem-layer"></div><div class="fx-layer"></div>';
+ const cells=grid.querySelector('.cell-layer'),layer=grid.querySelector('.gem-layer');
+ for(let i=0;i<N*N;i++){const cell=document.createElement('div');cell.className='cell';cell.dataset.i=i;cell.onclick=()=>tap(Math.floor(i/N),i%N);cells.appendChild(cell)}
+ for(const t of tiles) createGem(t,layer,false);
+ updateHud();
+}
+function createGem(t,layer,spawn=true){
+ const g=document.createElement('div');g.className='gem g'+t.v+(spawn?' spawn':'');g.dataset.id=t.id;g.style.setProperty('--r',t.r);g.style.setProperty('--c',t.c);layer.appendChild(g);t.el=g;
+ if(spawn) requestAnimationFrame(()=>requestAnimationFrame(()=>g.classList.add('land')));
+}
+function levelCost(level){return Math.floor(1000*Math.pow(1.35,level-1));}
+function scoreMultiplier(){return 1+(account.level-1)*0.05;}
+function startMoves(){return 29+account.level;}
+function refreshProgressUI(){
+ el('accountLevel').textContent=account.level;el('coins').textContent=Math.floor(account.coins).toLocaleString('ru-RU');
+ const cost=levelCost(account.level), pct=Math.min(100,account.coins/cost*100);
+ el('levelProgressText').textContent=`${Math.floor(account.coins)} / ${cost}`;el('levelProgressFill').style.width=pct+'%';
+ el('scoreMultiplier').textContent='×'+scoreMultiplier().toFixed(2);el('movesUpgradeValue').textContent=startMoves();el('nextMovesValue').textContent=startMoves()+1;el('multUpgradeValue').textContent='×'+scoreMultiplier().toFixed(2);
+ el('buyMovesLevel').textContent=`Повысить до ${account.level+1} — 🪙 ${cost}`;el('buyMovesLevel').disabled=account.coins<cost;
+ const s=account.stats;el('stat3').textContent=s.match3.toLocaleString('ru-RU');el('stat4').textContent=s.match4.toLocaleString('ru-RU');el('stat5').textContent=s.match5.toLocaleString('ru-RU');el('statExplosions').textContent=s.explosions.toLocaleString('ru-RU');el('statRounds').textContent=s.rounds.toLocaleString('ru-RU');el('statCleared').textContent=s.cleared.toLocaleString('ru-RU');
+ if(el('menuCoins'))el('menuCoins').textContent=Math.floor(account.coins).toLocaleString('ru-RU');
+ if(el('menuRubies'))el('menuRubies').textContent=Math.floor(account.rubies).toLocaleString('ru-RU');
+ if(el('menuBest'))el('menuBest').textContent=best.toLocaleString('ru-RU');
+ if(el('menuLevelValue'))el('menuLevelValue').textContent=account.level;
+ if(el('menuLevelProgress'))el('menuLevelProgress').textContent=`${Math.floor(account.coins)} / ${cost}`;
+ if(el('menuLevelFill'))el('menuLevelFill').style.width=pct+'%';
+ if(el('movesUpgradeValue2'))el('movesUpgradeValue2').textContent=startMoves();
+ if(el('multUpgradeValue2'))el('multUpgradeValue2').textContent='×'+scoreMultiplier().toFixed(2);
+ if(el('buyAccountLevel2')){el('buyAccountLevel2').textContent=`Повысить уровень — 🪙 ${cost}`;el('buyAccountLevel2').disabled=account.coins<cost;}
+ if(el('stat3m'))el('stat3m').textContent=s.match3.toLocaleString('ru-RU');if(el('stat4m'))el('stat4m').textContent=s.match4.toLocaleString('ru-RU');if(el('stat5m'))el('stat5m').textContent=s.match5.toLocaleString('ru-RU');if(el('statExplosionsm'))el('statExplosionsm').textContent=s.explosions.toLocaleString('ru-RU');if(el('statRoundsM'))el('statRoundsM').textContent=s.rounds.toLocaleString('ru-RU');if(el('statClearedM'))el('statClearedM').textContent=s.cleared.toLocaleString('ru-RU'); if(el('adminCoins'))el('adminCoins').textContent=Math.floor(account.coins).toLocaleString('ru-RU');if(el('adminRubies'))el('adminRubies').textContent=Math.floor(account.rubies).toLocaleString('ru-RU');if(el('adminLevel'))el('adminLevel').textContent=account.level;if(el('adminRounds'))el('adminRounds').textContent=s.rounds.toLocaleString('ru-RU');
+ // Menu-only lock. Gameplay HUD never depends on the navigation state.
+ const unlocked=s.rounds>=1;
+ if(el('navUpgrade'))el('navUpgrade').classList.toggle('locked',!unlocked);
+ if(el('upgradeLocked'))el('upgradeLocked').style.display=unlocked?'none':'block';
+ if(el('upgradeMain'))el('upgradeMain').style.display=unlocked?'block':'none';
+}
+
+function addRoundStat(type,n=1){roundStats[type]+=n;account.stats[type]+=n;}
+function awardRoundCoins(){
+ const s=roundStats;
+ const earned=s.match3*1+s.match4*3+s.match5*7+s.explosions*2+Math.floor(s.cleared/12)+Math.floor(score/250);
+ const coins=Math.max(1,earned);
+ account.coins+=coins;account.stats.rounds++;saveAccount();refreshProgressUI();return coins;
+}
+function openUpgrade(){refreshProgressUI();el('upgradePanel').classList.add('show')}
+function buyLevel(){if(account.stats.rounds<1){showBonusText('Сыграй первый раунд');return}const cost=levelCost(account.level);if(account.coins<cost)return;account.coins-=cost;account.level++;saveAccount();refreshProgressUI();showBonusText(`Уровень ${account.level}!`);}
+function updateHud(){
+ el('score').textContent=score.toLocaleString('ru-RU');el('moves').textContent=moves;refreshProgressUI();
+ el('hintInfo').textContent=freeHints>0?`Бесплатные подсказки: ${freeHints}`:'Подсказка: 📺 за рекламу';
+ const map=[['bomb','bombCount'],['rocketH','rocketHCount'],['rocketV','rocketVCount']];
+ for(const [key,id] of map) el(id).textContent=abilityCharges[key]>0?`Заряд: ${abilityCharges[key]}`:(boosterAdsUsed>=5?'Лимит 5/5':'📺 Реклама');
+}
+function selectVisual(){for(const t of tiles)if(t.el)t.el.classList.toggle('selected',selected===t.r*N+t.c)}
+function matches(){
+ const set=new Set();
+ for(let r=0;r<N;r++){let start=0;for(let c=1;c<=N;c++){
+   const same=c<N&&board[r][c]&&board[r][start]&&board[r][c].v===board[r][start].v;
+   if(same)continue;if(c-start>=3)for(let k=start;k<c;k++)set.add(board[r][k]);start=c;
+ }}
+ for(let c=0;c<N;c++){let start=0;for(let r=1;r<=N;r++){
+   const same=r<N&&board[r][c]&&board[start][c]&&board[r][c].v===board[start][c].v;
+   if(same)continue;if(r-start>=3)for(let k=start;k<r;k++)set.add(board[k][c]);start=r;
+ }}
+ return set;
+}
+function moveTile(t,r,c){
+  if(!t||!t.el)return;
+  // Force the browser to commit the current position before changing it.
+  // This prevents CSS transitions from collapsing old->new into a teleport.
+  void t.el.offsetTop;
+  t.r=r;
+  t.c=c;
+  t.el.style.setProperty('--r',r);
+  t.el.style.setProperty('--c',c);
+}
+async function animateSwap(a,b){
+ const ar=a.r,ac=a.c,br=b.r,bc=b.c;
+ moveTile(a,br,bc);moveTile(b,ar,ac);await sleep(MOVE_MS);
+ [board[ar][ac],board[br][bc]]=[board[br][bc],board[ar][ac]];
+}
+
+function fxPoint(r,c){return {x:(c+.5)/N*100,y:(r+.5)/N*100}}
+function addFx(cls,r,c,extra=''){
+ const layer=grid.querySelector('.fx-layer'); if(!layer)return null;
+ const p=fxPoint(r,c),e=document.createElement('div');e.className='fx '+cls+(extra?' '+extra:'');e.style.left=p.x+'%';e.style.top=p.y+'%';layer.appendChild(e);setTimeout(()=>e.remove(),800);return e
+}
+function burst(r,c,kind='normal',count=12){
+ const layer=grid.querySelector('.fx-layer');if(!layer)return;
+ const p=fxPoint(r,c);
+ if(kind==='normal') addFx('fx-ring',r,c);
+ if(kind==='four'){addFx('fx-ring purple',r,c);addFx('fx-cross',r,c)}
+ if(kind==='five'){addFx('fx-flash',r,c);addFx('fx-shock',r,c)}
+ for(let i=0;i<count;i++){
+   const s=document.createElement('div');s.className='fx-spark';
+   s.style.left=p.x+'%';s.style.top=p.y+'%';s.style.color=kind==='five'?'#ffd45a':kind==='four'?'#d6a1ff':'#fff';
+   s.style.setProperty('--ang',(i*(360/count)+(Math.random()*18-9))+'deg');s.style.setProperty('--dist',((kind==='five'?55:kind==='four'?42:30)+Math.random()*25)+'px');
+   layer.appendChild(s);setTimeout(()=>s.remove(),600);
+ }
+}
+function beam(r,c,vertical){
+ const layer=grid.querySelector('.fx-layer');if(!layer)return;
+ const e=document.createElement('div');e.className='fx-beam';
+ if(vertical){e.style.width='9px';e.style.height='92%';e.style.left=((c+.5)/N*100)+'%';e.style.top='4%';e.style.transformOrigin='center top';e.style.transform='scaleY(0)';e.style.animation='beamInV .42s ease-out forwards'}
+ else{e.style.width='92%';e.style.left='4%';e.style.top=((r+.5)/N*100)+'%'}
+ layer.appendChild(e);setTimeout(()=>e.remove(),600);
+}
+function analyzeGroups(){
+ const groups=[];
+ for(let r=0;r<N;r++){
+   let start=0;
+   for(let c=1;c<=N;c++){
+     const same=c<N&&board[r][c]&&board[r][start]&&board[r][c].v===board[r][start].v;
+     if(same)continue;
+     const len=c-start;
+     if(len>=3) groups.push({len,cells:Array.from({length:len},(_,k)=>board[r][start+k]),r,c,start,vertical:false});
+     start=c;
+   }
+ }
+ for(let c=0;c<N;c++){
+   let start=0;
+   for(let r=1;r<=N;r++){
+     const same=r<N&&board[r][c]&&board[start][c]&&board[r][c].v===board[start][c].v;
+     if(same)continue;
+     const len=r-start;
+     if(len>=3) groups.push({len,cells:Array.from({length:len},(_,k)=>board[start+k][c]),r,c,start,vertical:true});
+     start=r;
+   }
+ }
+ return groups;
+}
+function megaClearFx(groups,hit){
+ const layer=grid.querySelector('.fx-layer'); if(!layer)return;
+ const boardEl=grid;
+ boardEl.classList.remove('board-shake'); void boardEl.offsetWidth; boardEl.classList.add('board-shake');
+ const strongest=[...groups].sort((a,b)=>b.len-a.len)[0];
+ const center=strongest ? strongest.cells[Math.floor(strongest.cells.length/2)] : [...hit][0];
+ addFx('fx-mega',center.r,center.c); addFx('fx-mega-ring',center.r,center.c);
+ const wave=document.createElement('div'); wave.className='fx-wave'; layer.appendChild(wave); setTimeout(()=>wave.remove(),700);
+ const p=fxPoint(center.r,center.c);
+ for(let i=0;i<42;i++){
+   const s=document.createElement('div'); s.className='fx-star';
+   s.style.left=p.x+'%'; s.style.top=p.y+'%';
+   s.style.setProperty('--ang',(i*(360/42)+(Math.random()*14-7))+'deg');
+   s.style.setProperty('--dist',(70+Math.random()*95)+'px');
+   layer.appendChild(s); setTimeout(()=>s.remove(),800);
+ }
+}
+function playMatchFx(groups){
+ const strongest=[...groups].sort((a,b)=>b.len-a.len)[0];
+ for(const g of groups){
+   const mid=g.cells[Math.floor(g.cells.length/2)];
+   if(g.len>=5){burst(mid.r,mid.c,'five',28);}
+   else if(g.len===4){burst(mid.r,mid.c,'four',20);beam(g.r,g.c,g.vertical);}
+   else {burst(mid.r,mid.c,'normal',12);}
+ }
+ if(groups.length>=2 && strongest){
+   const mid=strongest.cells[Math.floor(strongest.cells.length/2)];
+   burst(mid.r,mid.c,'four',18);
+ }
+}
+async function resolve(){
+ let chain=0;
+ while(true){
+   // One unified detector is used for every line length: 3, 4, 5+ and cascades.
+   const groups=analyzeGroups();
+   const hit=new Set();
+   let maxLine=0;
+   for(const g of groups){
+     maxLine=Math.max(maxLine,g.len);
+     for(const t of g.cells) if(t) hit.add(t);
+   }
+   if(hit.size===0) break;
+   chain++;
+
+   // Lifetime performance stats: count every detected line.
+   for(const g of groups){
+     if(g.len===3) addRoundStat('match3');
+     else if(g.len===4) addRoundStat('match4');
+     else if(g.len>=5) addRoundStat('match5');
+   }
+   addRoundStat('cleared',hit.size);
+   if(maxLine>=5) grantBonusMoves(5);
+   else if(maxLine===4) grantBonusMoves(4);
+   else if(hit.size>=10) grantBonusMoves(10);
+
+   const isExplosion=hit.size>=7 || groups.length>=3 || (chain>=2 && hit.size>=5);
+   if(isExplosion){addRoundStat('explosions');megaClearFx(groups,hit);}
+   playMatchFx(groups);
+   score+=Math.round((hit.size*10*chain+(chain>1?chain*25:0))*scoreMultiplier());
+   updateHud();
+
+   // Pop every matched gem, including all gems in 4/5+ lines.
+   for(const t of hit) if(t.el) t.el.classList.add('pop');
+   await sleep(POP_MS);
+
+   for(const t of hit){
+     if(t.el) t.el.remove();
+     if(board[t.r] && board[t.r][t.c]===t) board[t.r][t.c]=null;
+   }
+   tiles=tiles.filter(t=>!hit.has(t));
+
+   // Gravity: survivors slide to their final rows.
+   for(let c=0;c<N;c++){
+     let write=N-1;
+     for(let r=N-1;r>=0;r--){
+       const t=board[r][c];
+       if(t){
+         if(r!==write){
+           board[write][c]=t;
+           board[r][c]=null;
+           moveTile(t,write,c);
+         }
+         write--;
+       }
+     }
+     // Spawn exactly the number of missing gems above the column.
+     for(let r=write;r>=0;r--){
+       const t={id:nextId++,v:random(),r:r-N,c,el:null};
+       board[r][c]=t;
+       tiles.push(t);
+       createGem(t,grid.querySelector('.gem-layer'),true);
+       t.el.style.setProperty('--r',r-N);
+       requestAnimationFrame(()=>requestAnimationFrame(()=>{
+         t.r=r;
+         t.el.style.setProperty('--r',r);
+       }));
+     }
+   }
+   await sleep(FALL_MS);
+ }
+}
+function adjacent(a,b){return Math.abs(Math.floor(a/N)-Math.floor(b/N))+Math.abs(a%N-b%N)===1}
+async function tap(r,c){
+ if(busy||moves<=0)return;
+ if(abilityMode){await useAbilityAt(r,c);return;}
+ const i=r*N+c;
+ if(selected<0){selected=i;selectVisual();return}
+ if(selected===i){selected=-1;selectVisual();return}
+ if(!adjacent(selected,i)){selected=i;selectVisual();return}
+ const a=board[Math.floor(selected/N)][selected%N],b=board[r][c];selected=-1;selectVisual();busy=true;
+ try{
+   await animateSwap(a,b);
+   if(!matches().size){await animateSwap(a,b);return;}
+   moves--;updateHud();await resolve();if(moves<=0)end();
+ }finally{busy=false;}
+}
+
+function end(){if(score>best){best=score;localStorage.setItem('crystal_best',best);el('best').textContent=best}const earned=awardRoundCoins();el('final').textContent=`Ты набрал ${score.toLocaleString('ru-RU')} очков.\n🪙 За эффективность: +${earned} монет.`;showContinue();el('message').classList.add('show')}
+function start(){el('message').classList.remove('show');el('upgradePanel').classList.remove('show');el('app').classList.add('game-mode');score=0;moves=startMoves();selected=-1;busy=false;abilityMode=null;abilityAdBusy=false;freeHints=5;hintAdBusy=false;continueAdUsed=false;boosterAdsUsed=0;roundStats={match3:0,match4:0,match5:0,explosions:0,cleared:0};abilityCharges={bomb:account.boosters.bomb,rocketH:account.boosters.rocketH,rocketV:account.boosters.rocketV};grid.classList.remove('abilityMode');makeBoard();buildBoard()}
+el('new').onclick=start;el('again').onclick=start;
+el('hint').onclick=async()=>{
+ if(busy||moves<=0)return;
+ if(freeHints<=0){
+   if(hintAdBusy)return;
+   hintAdBusy=true;
+   const b=el('hint');
+   b.disabled=true;b.textContent='📺 Реклама…';
+   await sleep(1600);
+   freeHints=1;
+   hintAdBusy=false;
+   b.disabled=false;b.textContent='Подсказка';
+   updateHud();
+ }
+ for(let r=0;r<N;r++)for(let c=0;c<N;c++)for(const [dr,dc] of [[0,1],[1,0]]){
+   const r2=r+dr,c2=c+dc;if(r2>=N||c2>=N)continue;
+   const a=board[r][c],b=board[r2][c2];[board[r][c],board[r2][c2]]=[b,a];
+   const ok=matches().size>0;[board[r][c],board[r2][c2]]=[a,b];
+   if(ok){
+     freeHints=Math.max(0,freeHints-1);updateHud();
+     selected=r*N+c;selectVisual();setTimeout(()=>{if(selected===r*N+c){selected=-1;selectVisual()}},700);return;
+   }
+ }
+};
+
+
+function grantBonusMoves(cleared){
+  let bonus=0;
+  if(cleared>=10) bonus=3;
+  else if(cleared>=5) bonus=2;
+  else if(cleared===4) bonus=1;
+  if(bonus>0){
+    moves+=bonus;
+    updateHud();
+    showBonusText(`+${bonus} ${bonus===1?'ход':'хода'}!`);
+  }
+}
+function showBonusText(text){
+  const n=document.createElement('div');
+  n.className='bonusText';
+  n.textContent=text;
+  document.body.appendChild(n);
+  setTimeout(()=>n.remove(),900);
+}
+function simulateAd(label='📺 Просмотр рекламы…'){return new Promise(resolve=>setTimeout(resolve,1500))}
+function armAbility(key){
+ if(busy||moves<=0)return;
+ if(abilityCharges[key]<=0){watchAbilityAd(key);return}
+ abilityMode=key;selected=-1;selectVisual();grid.classList.add('abilityMode');updateHud();showBonusText(key==='bomb'?'Выбери клетку для бомбы':key==='rocketH'?'Выбери строку для ракеты':'Выбери столбец для ракеты');
+}
+async function watchAbilityAd(key){
+ if(abilityAdBusy||boosterAdsUsed>=5){if(boosterAdsUsed>=5)showBonusText('Лимит рекламы бустеров: 5');return}
+ abilityAdBusy=true;boosterAdsUsed++;
+ const btn=el(key==='bomb'?'bomb':key==='rocketH'?'rocketH':'rocketV');
+ btn.disabled=true;btn.classList.add('ad');btn.querySelector('.count').textContent=`📺 ${boosterAdsUsed}/5`;
+ await simulateAd();abilityCharges[key]++;abilityAdBusy=false;btn.disabled=false;btn.querySelector('.count').textContent=`Заряд: ${abilityCharges[key]}`;showBonusText(`Получен заряд! Бустеры: ${boosterAdsUsed}/5`);updateHud();
+}
+async function useAbilityAt(r,c){
+ const key=abilityMode;if(!key){cancelAbility();return}abilityCharges[key]=Math.max(0,Number(abilityCharges[key])||0);if(abilityCharges[key]<=0){cancelAbility();return}
+ abilityMode=null;grid.classList.remove('abilityMode');busy=true;if(account.boosters[key]>0){account.boosters[key]--;abilityCharges[key]--;}else{abilityCharges[key]--;}addRoundStat('explosions');updateHud();
+ const hit=new Set();
+ if(key==='bomb'){
+   for(let rr=Math.max(0,r-1);rr<=Math.min(N-1,r+1);rr++)for(let cc=Math.max(0,c-1);cc<=Math.min(N-1,c+1);cc++)hit.add(board[rr][cc]);
+   addFx('fx-flash',r,c);addFx('fx-shock',r,c);burst(r,c,'five',30);
+ }else if(key==='rocketH'){
+   for(let cc=0;cc<N;cc++)hit.add(board[r][cc]);beam(r,c,false);addFx('fx-ring purple',r,c);
+ }else{
+   for(let rr=0;rr<N;rr++)hit.add(board[rr][c]);beam(r,c,true);addFx('fx-ring purple',r,c);
+ }
+ for(const t of hit)if(t?.el)t.el.classList.add('pop');
+ await sleep(POP_MS);
+ for(const t of hit){if(t?.el)t.el.remove();if(board[t.r]&&board[t.r][t.c]===t)board[t.r][t.c]=null}
+ tiles=tiles.filter(t=>!hit.has(t));
+ for(let cc=0;cc<N;cc++){
+   let write=N-1;
+   for(let rr=N-1;rr>=0;rr--){const t=board[rr][cc];if(t){if(rr!==write){board[write][cc]=t;board[rr][cc]=null;moveTile(t,write,cc)}write--;}}
+   for(let rr=write;rr>=0;rr--){const t={id:nextId++,v:random(),r:rr-N,c:cc,el:null};board[rr][cc]=t;tiles.push(t);createGem(t,grid.querySelector('.gem-layer'),true);t.el.style.setProperty('--r',rr-N);requestAnimationFrame(()=>requestAnimationFrame(()=>{t.r=rr;t.el.style.setProperty('--r',rr)}));}
+ }
+ await sleep(FALL_MS);score+=Math.round((key==='bomb'?120:100)*scoreMultiplier());updateHud();await resolve();busy=false;if(moves<=0)end();
+}
+function cancelAbility(){abilityMode=null;grid.classList.remove('abilityMode');}
+
+function showContinue(){
+ const old=document.getElementById('continueBtn');if(old)old.remove();
+ if(continueAdUsed)return;
+ const b=document.createElement('button');b.id='continueBtn';b.className='primary';b.textContent='📺 +10 ходов за рекламу';
+ b.onclick=async()=>{b.disabled=true;b.textContent='📺 Просмотр рекламы…';await simulateAd();continueAdUsed=true;moves+=10;updateHud();el('message').classList.remove('show');b.remove();showBonusText('+10 ходов!');};
+ el('message').appendChild(b);
+}
+
+
+const dailyRewards=[
+ {coins:500},
+ {rubies:3},
+ {coins:1000},
+ {rubies:5},
+ {coins:1500},
+ {rubies:7},
+ {coins:2500,rubies:10}
+];
+const achievementDefs=[
+ {id:'a3',icon:'🔹',title:'Первая тройка',desc:'Собрать 3 в ряд 100 раз',stat:'match3',target:100,coins:500},
+ {id:'a4',icon:'🔷',title:'Четвёрка',desc:'Собрать 4 в ряд 50 раз',stat:'match4',target:50,rubies:3},
+ {id:'a5',icon:'💎',title:'Пять в ряд',desc:'Собрать 5+ в ряд 25 раз',stat:'match5',target:25,rubies:5},
+ {id:'ab',icon:'💥',title:'Большой взрыв',desc:'Сделать 50 взрывов',stat:'explosions',target:50,coins:1000},
+ {id:'ac',icon:'✨',title:'Кристальный мастер',desc:'Очистить 2 000 кристаллов',stat:'cleared',target:2000,rubies:7},
+ {id:'ar',icon:'🎮',title:'Затягивает',desc:'Сыграть 25 раундов',stat:'rounds',target:25,coins:1500}
+];
+function localDateKey(d=new Date()){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`}
+function dayDiff(a,b){return Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000)}
+function loadDaily(){
+ let s=JSON.parse(localStorage.getItem('crystal_daily')||'null')||{day:1,lastClaim:null,streak:0,coinAd:null,rubyAd:null,achievements:{}};
+ s.day=Number(s.day)||1;s.streak=Number(s.streak)||0;s.achievements=s.achievements||{};return s;
+}
+let daily=loadDaily();
+function saveDaily(){localStorage.setItem('crystal_daily',JSON.stringify(daily));}
+function syncDailyState(){
+ const today=localDateKey();
+ if(daily.lastClaim && daily.lastClaim!==today){const diff=dayDiff(daily.lastClaim,today);if(diff>2){daily.day=1;daily.streak=0;}}
+}
+function dailyRewardText(r){const a=[];if(r.coins)a.push(`🪙 ${r.coins.toLocaleString('ru-RU')}`);if(r.rubies)a.push(`♦ ${r.rubies}`);return a.join(' + ')}
+function renderCalendar(){
+ syncDailyState();const today=localDateKey();const claimed=daily.lastClaim===today;const grid=el('calendarGrid');grid.innerHTML='';
+ dailyRewards.forEach((r,i)=>{const d=document.createElement('div');d.className='dayCard'+(i+1===daily.day?' current':'')+(i+1<daily.day?' claimed':'');d.innerHTML=`<div class="day">ДЕНЬ ${i+1}</div><div class="reward">${dailyRewardText(r)}</div><div class="check">${i+1<daily.day?'✓':i+1===daily.day&&claimed?'✓':'•'}</div>`;grid.appendChild(d)});
+ const r=dailyRewards[daily.day-1]||dailyRewards[0];el('dailyClaimTitle').textContent=claimed?'Награда получена ✓':`День ${daily.day}: ${dailyRewardText(r)}`;el('dailyClaimSub').textContent=claimed?'Возвращайся завтра за следующей наградой.':`Серия входов: ${daily.streak||0} дн.`;el('claimDailyBtn').disabled=claimed;el('claimDailyBtn').textContent=claimed?'✓ ПОЛУЧЕНО':'🎁 ЗАБРАТЬ';
+ const coinClaimed=daily.coinAd===today,rubyClaimed=daily.rubyAd===today;el('coinAdBtn').disabled=coinClaimed;el('rubyAdBtn').disabled=rubyClaimed;el('coinAdBtn').textContent=coinClaimed?'✓ Получено':'📺 Получить';el('rubyAdBtn').textContent=rubyClaimed?'✓ Получено':'📺 Получить';el('coinAdStatus').textContent=coinClaimed?'Сегодня уже получено':'1 раз в сутки';el('rubyAdStatus').textContent=rubyClaimed?'Сегодня уже получено':'1 раз в сутки';
+}
+function renderAchievements(){
+ const grid=el('achGrid');grid.innerHTML='';
+ for(const a of achievementDefs){const value=Math.min(a.target,Number(account.stats[a.stat]||0)),done=!!daily.achievements[a.id]||value>=a.target;if(done&&!daily.achievements[a.id]){if(a.coins)account.coins+=a.coins;if(a.rubies)account.rubies+=a.rubies;daily.achievements[a.id]=true;saveAccount();saveDaily();showBonusText(`🏆 ${a.title}!`)}const reward=[];if(a.coins)reward.push(`🪙 ${a.coins}`);if(a.rubies)reward.push(`♦ ${a.rubies}`);const item=document.createElement('div');item.className='achItem';item.innerHTML=`<div class="achIcon">${a.icon}</div><div class="achInfo"><b>${a.title}${done?' ✓':''}</b><small>${a.desc}</small><div class="achBar"><i style="width:${value/a.target*100}%"></i></div></div><div class="achReward">${reward.join('<br>')}</div>`;grid.appendChild(item)}
+ refreshProgressUI();
+}
+async function claimDaily(){
+ syncDailyState();const today=localDateKey();if(daily.lastClaim===today)return;const diff=daily.lastClaim?dayDiff(daily.lastClaim,today):0;if(daily.lastClaim){if(diff===1||diff===2){daily.day=daily.day>=7?1:daily.day+1;daily.streak=(daily.streak||0)+1}else if(diff>2){daily.day=1;daily.streak=1}}else{daily.day=1;daily.streak=1}
+ const r=dailyRewards[daily.day-1];if(r.coins)account.coins+=r.coins;if(r.rubies)account.rubies+=r.rubies;daily.lastClaim=today;saveAccount();saveDaily();refreshProgressUI();renderCalendar();showBonusText(`🎁 Получено: ${dailyRewardText(r)}`);
+}
+async function claimDailyAd(type){
+ const today=localDateKey();if(type==='coins'&&daily.coinAd===today)return;if(type==='rubies'&&daily.rubyAd===today)return;
+ const btn=el(type==='coins'?'coinAdBtn':'rubyAdBtn');btn.disabled=true;btn.textContent='📺 Реклама…';await simulateAd();if(type==='coins'){account.coins+=1500;daily.coinAd=today}else{account.rubies+=5;daily.rubyAd=today}saveAccount();saveDaily();refreshProgressUI();renderCalendar();showBonusText(type==='coins'?'+1 500 🪙':'+5 ♦');
+}
+function openRewards(tab='calendar'){syncDailyState();el('menuHome').style.display='none';el('menuStore').style.display='none';el('menuUpgrade').style.display='none';el('menuRewards').style.display='block';el('navHome').classList.remove('active');el('navStore').classList.remove('active');el('navUpgrade').classList.remove('active');el('rewardTabCalendar').classList.toggle('active',tab==='calendar');el('rewardTabAchievements').classList.toggle('active',tab==='ach');el('calendarPanel').style.display=tab==='calendar'?'block':'none';el('achievementsPanel').style.display=tab==='ach'?'block':'none';if(tab==='calendar')renderCalendar();else renderAchievements();refreshProgressUI();}
+
+function renderStore(){
+ el('invBomb').textContent=account.boosters.bomb;el('invRocketH').textContent=account.boosters.rocketH;el('invRocketV').textContent=account.boosters.rocketV;
+}
+function buyStorePack(key,count,cost){
+ if(account.rubies<cost){showBonusText('Недостаточно рубинов');return;}
+ account.rubies-=cost;account.boosters[key]+=count;saveAccount();refreshProgressUI();renderStore();showBonusText(`+${count} заряд${count===1?'':'а'}!`);
+}
+function adminAddCoins(amount){account.coins=Math.max(0,Math.floor(account.coins)+amount);saveAccount();refreshProgressUI();showBonusText(`+${amount.toLocaleString('ru-RU')} 🪙`);}
+function adminAddRubies(amount){account.rubies=Math.max(0,Math.floor(account.rubies)+amount);saveAccount();refreshProgressUI();showBonusText(`+${amount.toLocaleString('ru-RU')} ♦`);}
+function adminReset(){
+ if(!confirm('Сбросить весь прогресс аккаунта и рекорд?'))return;
+ account.level=1;account.coins=2000;account.rubies=25;account.boosters={bomb:0,rocketH:0,rocketV:0};account.stats={match3:0,match4:0,match5:0,explosions:0,cleared:0,rounds:0};account.economyVersion=8;
+ daily={day:1,lastClaim:null,streak:0,coinAd:null,rubyAd:null,achievements:{}};
+ localStorage.removeItem('crystal_best');best=0;
+ abilityCharges={bomb:0,rocketH:0,rocketV:0};saveAccount();saveDaily();refreshProgressUI();renderStore();showMenu();showBonusText('Прогресс сброшен');
+}
+function showMenuPage(page){
+ if(page==='upgrade' && account.stats.rounds<1){showBonusText('Прокачка откроется после первого раунда');return;}
+ if(page==='store')renderStore();
+ el('menuHome').style.display=page==='home'?'block':'none';el('menuStore').style.display=page==='store'?'block':'none';el('menuUpgrade').style.display=page==='upgrade'?'block':'none';el('menuRewards').style.display=page==='rewards'?'block':'none';el('menuAdmin').style.display=page==='admin'?'block':'none';
+ el('navHome').classList.toggle('active',page==='home');el('navStore').classList.toggle('active',page==='store');el('navUpgrade').classList.toggle('active',page==='upgrade');el('navAdmin').classList.toggle('active',page==='admin');
+ if(page==='home'){syncDailyState();const claimed=daily.lastClaim===localDateKey();el('rewardTeaserTitle').textContent=claimed?'ЕЖЕДНЕВНАЯ НАГРАДА ✓':'ЕЖЕДНЕВНАЯ НАГРАДА';el('rewardTeaserSub').textContent=claimed?'Следующая награда завтра':`День ${daily.day} из 7 • Забери награду`;}
+ refreshProgressUI();
+}
+function showMenu(){
+ el('app').classList.remove('game-mode');el('menuScreen').style.display='flex';syncDailyState();showMenuPage('home');
+}
+function enterGame(){
+ el('menuScreen').style.display='none';el('app').classList.add('game-mode');start();
+}
+el('toMenu').onclick=()=>{el('message').classList.remove('show');showMenu()};
+el('playBtn').onclick=enterGame;el('navHome').onclick=()=>showMenuPage('home');el('navStore').onclick=()=>showMenuPage('store');el('navUpgrade').onclick=()=>showMenuPage('upgrade');el('navAdmin').onclick=()=>showMenuPage('admin');
+el('adminCoins100').onclick=()=>adminAddCoins(100);el('adminCoins1000').onclick=()=>adminAddCoins(1000);el('adminCoins10000').onclick=()=>adminAddCoins(10000);el('adminCoinsMax').onclick=()=>adminAddCoins(100000);el('adminRubies10').onclick=()=>adminAddRubies(10);el('adminRubies100').onclick=()=>adminAddRubies(100);el('adminRubies1000').onclick=()=>adminAddRubies(1000);el('adminRubiesMax').onclick=()=>adminAddRubies(10000);el('adminReset').onclick=adminReset;el('rewardsTeaser').onclick=()=>openRewards('calendar');el('rewardBack').onclick=()=>showMenuPage('home');el('rewardTabCalendar').onclick=()=>openRewards('calendar');el('rewardTabAchievements').onclick=()=>openRewards('ach');el('claimDailyBtn').onclick=claimDaily;el('coinAdBtn').onclick=()=>claimDailyAd('coins');el('rubyAdBtn').onclick=()=>claimDailyAd('rubies');
+el('upgradeBtn').onclick=()=>showMenuPage('upgrade');el('closeUpgrade').onclick=()=>el('upgradePanel').classList.remove('show');el('buyMovesLevel').onclick=buyLevel;el('buyAccountLevel').onclick=buyLevel;el('buyAccountLevel2').onclick=buyLevel;el('buyBomb1').onclick=()=>buyStorePack('bomb',1,12);el('buyBomb5').onclick=()=>buyStorePack('bomb',5,50);el('buyRocketH1').onclick=()=>buyStorePack('rocketH',1,10);el('buyRocketH5').onclick=()=>buyStorePack('rocketH',5,42);el('buyRocketV1').onclick=()=>buyStorePack('rocketV',1,10);el('buyRocketV5').onclick=()=>buyStorePack('rocketV',5,42);
+el('bomb').onclick=()=>armAbility('bomb');
+el('rocketH').onclick=()=>armAbility('rocketH');
+el('rocketV').onclick=()=>armAbility('rocketV');
+
+refreshProgressUI();renderStore();saveAccount();showMenu();
+})();
+</script>
+</body>
+</html>
